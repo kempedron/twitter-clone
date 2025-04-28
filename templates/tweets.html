@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Твиты пользователя</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f8fa;
+            margin: 0;
+            display: flex;
+        }
+        header {
+            background-color: #1da1f2;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+        }
+        .sidebar {
+            flex: 1;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-right: 20px;
+            border-radius: 8px;
+        }
+        .sidebar h3 {
+            margin-top: 0;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #1da1f2;
+            display: block;
+            margin: 10px 0;
+        }
+        .tweets {
+            flex: 3;
+        }
+        .tweet {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+            padding: 15px;
+        }
+        .tweet h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .tweet p {
+            margin: 5px 0;
+        }
+        .tweet small {
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Твиты пользователя</h1>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="friends-link">
+                <a href="/home-page">мой профиль</a>
+            </div>
+                <div class="friends-link">
+                    <a href="/search-users">поиск</a>
+                </div>
+                <div class="friends-link">
+                    <a href="#">сообщества</a>
+                </div>
+                <div class="friends-link">
+                    <a href="/follow-page">подписаться</a>
+                </div>
+                <div class="friends-link">
+                    <a href="/view-subscrives">подписки</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tweets">
+            {{range .}}
+                <div class="tweet">
+                    <h2>{{.Title}}</h2>
+                    <p>{{.Content}}</p>
+                    <small>Опубликовано: {{.PublicTime}}</small>
+                </div>
+            {{end}}
+        </div>
+    </div>
+
+</body>
+</html>
