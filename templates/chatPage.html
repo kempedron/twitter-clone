@@ -4,16 +4,114 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Чат</title>
-    <link rel="stylesheet" href="/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f8fa; /* Светлый фон */
+            color: #14171a; /* Темный текст */
+            margin: 0;
+            padding: 0;
+        }
+        
+        #chat {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white; /* Белый фон для чата */
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Скрываем переполнение */
+        }
+        
+        #messages {
+            padding: 20px;
+            max-height: 400px; /* Ограничиваем высоту блока сообщений */
+            overflow-y: auto; /* Добавляем прокрутку */
+            border-bottom: 1px solid #e1e8ed; /* Линия разделения */
+        }
+        
+        #messages ul {
+            list-style-type: none; /* Убираем маркеры списка */
+            padding: 0;
+            margin: 0;
+        }
+        
+        #messages li {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #f0f8ff; /* Светлый фон для сообщений */
+            position: relative; /* Для абсолютного позиционирования времени */
+        }
+        
+        #messages strong {
+            display: block; /* Отображаем имя и сообщение на отдельных строках */
+            font-size: 14px; /* Размер шрифта для имени */
+            color: #1da1f2; /* Цвет для Username */
+            margin-bottom: 5px; /* Отступ между именем и сообщением */
+        }
+
+        #messages .message-content {
+            font-size: 18px; /* Размер шрифта для сообщения */
+            text-align: center; /* Выравнивание текста по центру */
+            font-weight: bold; /* Жирный шрифт */
+        }
+
+        #messages .timestamp {
+            position: absolute; /* Абсолютное позиционирование для времени */
+            bottom: 5px; /* Отступ снизу */
+            right: 10px; /* Отступ справа */
+            font-size: 12px; /* Размер шрифта для времени */
+            color: #657786; /* Цвет для времени */
+        }
+        
+        form {
+            display: flex;
+            padding: 15px;
+            background-color: #f5f8fa; /* Фон формы ввода */
+        }
+        
+        #message-input {
+            flex: 1; /* Занимает все доступное пространство */
+            padding: 10px;
+            border: 1px solid #e1e8ed;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-right: 10px; /* Отступ между полем ввода и кнопкой */
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #1da1f2; /* Цвет кнопки */
+            color: white; /* Цвет текста на кнопке */
+            cursor: pointer; /* Указатель при наведении */
+            font-size: 16px;
+            transition: background-color 0.3s; /* Плавный переход цвета */
+        }
+        
+        button:hover {
+            background-color: #0d8bf2; /* Темный цвет при наведении */
+        }
+    </style>
 </head>
 <body>
     <div id="chat">
-        <div id="messages"></div>
-        <form id="message-form">
-            <input type="text" id="message-input" placeholder="Введите ваше сообщение" required />
+        <div id="messages">
+            <ul>
+                {{range .Messages}} <!-- Здесь мы итерируемся по массиву сообщений -->
+                <li>
+                    <strong>{{.Username}}</strong> <!-- Имя пользователя -->
+                    <div class="content">{{.Content}}</div> <!-- Содержимое сообщения -->
+                    <div class="timestamp">{{.CreatedAt}}</div> <!-- Время отправки -->
+                </li>
+                {{end}}
+            </ul>
+        </div>
+        <form method="post" action="/chat/{{.ChatID}}/user/{{.UserID}}/message">
+            <input type="text" id="message-input" name="message" placeholder="Введите ваше сообщение" required />
             <button type="submit">Отправить</button>
         </form>
     </div>
-    <script src="/static/script.js"> </script>
 </body>
 </html>

@@ -2,28 +2,16 @@ package functionsdb
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+	db "twitter/DataBase"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
 )
-
-var db *sql.DB
-var err error
-
-func InitDB() error {
-	db, err = sql.Open("postgres", "user=postgres password=322 dbname=twitter sslmode=disable")
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	return db.Ping()
-}
 
 type User struct {
 	Id       int
@@ -43,24 +31,25 @@ type Post struct {
 var store = sessions.NewCookieStore([]byte("secret-key"))
 
 func LogIn(c echo.Context) error {
+	db := db.Get()
 	if c.Request().Method == http.MethodPost {
 		inputUsername := c.FormValue("username")
 		inputPassword := c.FormValue("password")
 
 		if strings.TrimSpace(inputPassword) == "" || strings.TrimSpace(inputUsername) == "" {
-			return c.String(http.StatusBadRequest, "поля не должны быть пустыми")
+			return c.String(http.StatusBadRequest, "Поля не должны быть пустыми")
 		}
 
 		var storedPassword string
 		err := db.QueryRow("SELECT user_password FROM users WHERE username = $1", inputUsername).Scan(&storedPassword)
 		if err != nil {
 			log.Println("Ошибка при получении пароля:", err)
-			return c.String(http.StatusUnauthorized, "неверное имя пользователя")
+			return c.String(http.StatusUnauthorized, "Неверное имя пользователя")
 		}
 
 		if storedPassword != inputPassword {
 			log.Println("Неверный пароль для пользователя:", inputUsername)
-			return c.String(http.StatusUnauthorized, "неверный пароль")
+			return c.String(http.StatusUnauthorized, "Неверный пароль")
 		}
 
 		// Устанавливаем куку
@@ -72,19 +61,46 @@ func LogIn(c echo.Context) error {
 		c.SetCookie(cookie)
 
 		// Работа с сессией
-		session, _ := store.Get(c.Request(), "session")
+		session, err := store.Get(c.Request(), "session")
+		if err != nil {
+			log.Printf("Ошибка при получении сессии: %v", err)
+			return c.String(http.StatusInternalServerError, "Ошибка сервера")
+		}
+
 		session.Values["username"] = inputUsername
-		log.Println("Текущая сессия:", session.Values)
+		log.Println("Текущая сессия перед сохранением:", session.Values)
 
-		session.Save(c.Request(), c.Response())
+		if err := session.Save(c.Request(), c.Response()); err != nil {
+			log.Printf("Ошибка при сохранении сессии: %v", err)
+			return c.String(http.StatusInternalServerError, "Ошибка сервера")
+		}
 
-		return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/home-page/%s", inputUsername))
+		return c.Redirect(http.StatusSeeOther, "/home-page")
 	}
 
-	return c.String(http.StatusMethodNotAllowed, "неверный метод запроса")
+	return c.String(http.StatusMethodNotAllowed, "Неверный метод запроса")
+}
+
+func CheckAuthorization(c echo.Context) error {
+	session, err := store.Get(c.Request(), "session")
+	if err != nil {
+		log.Printf("Ошибка при получении сессии: %v", err)
+		return c.String(http.StatusInternalServerError, "Ошибка сервера")
+	}
+
+	username, ok := session.Values["username"].(string)
+	if !ok || username == "" {
+		log.Println("Пользователь не авторизован")
+		return c.String(http.StatusUnauthorized, "необходимо войти")
+	}
+
+	log.Println("Пользователь авторизован:", username)
+	return c.String(http.StatusOK, "Добро пожаловать, "+username)
 }
 
 func SeeTweets(c echo.Context) error {
+	db := db.Get()
+
 	session, err := store.Get(c.Request(), "session")
 	if err != nil {
 		log.Println("Ошибка при получении сессии:", err)
@@ -126,6 +142,8 @@ func SeeTweets(c echo.Context) error {
 }
 
 func RegisterNewUser(c echo.Context) error {
+	db := db.Get()
+
 	newUserName := c.FormValue("newUserName")
 	newUserPassword := c.FormValue("newUserPassword")
 	result, err := db.Exec("INSERT INTO users(username, user_password) VALUES($1, $2) ON CONFLICT (username) DO NOTHING", newUserName, newUserPassword)
@@ -145,6 +163,8 @@ func RegisterNewUser(c echo.Context) error {
 }
 
 func SearchUsers(c echo.Context) error {
+	db := db.Get()
+
 	username := c.FormValue("username")
 	log.Println("Получен юзернейм:", username)
 
@@ -176,6 +196,8 @@ func SearchUsers(c echo.Context) error {
 }
 
 func Follow(c echo.Context) error {
+	db := db.Get()
+
 	username2 := c.FormValue("username2")
 	usernameCookie, err := c.Cookie("username")
 	if err != nil {
@@ -188,13 +210,10 @@ func Follow(c echo.Context) error {
 	log.Println("user1", usernameCookie, "user2", username2)
 
 	err = db.QueryRow("SELECT id FROM users WHERE username=$1", username2).Scan(&id_us2)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusNotFound, "Пользователь не найден")
-		}
-		log.Println(err)
-		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	if err == sql.ErrNoRows {
+		return c.String(http.StatusNotFound, "Пользователь не найден")
 	}
+
 	if err != nil {
 		log.Println(err)
 
@@ -217,6 +236,8 @@ func Follow(c echo.Context) error {
 }
 
 func ViewAllSubscribe(c echo.Context) error {
+	db := db.Get()
+
 	usernameCookie, err := c.Cookie("username")
 	username := usernameCookie.Value
 	if err != nil {
@@ -232,6 +253,9 @@ func ViewAllSubscribe(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, "внутренняя ошибка сервера")
 	}
 	rows, err := db.Query("SELECT username FROM users WHERE id=$1", idForName)
+	if err != nil {
+		log.Println(err)
+	}
 
 	defer rows.Close()
 

@@ -1,34 +1,29 @@
-const chatID = "ваш_chat_id"; // Замените на реальный chat_id
-const userID = "ваш_user_id"; // Замените на реальный user_id
+document.getElementById("message-form").addEventListener("submit", function(event) {
+    event.preventDefault();
+    
+    const messageInput = document.getElementById("message-input");
+    const messageContent = messageInput.value;
+    
+    // Здесь вы можете отправить сообщение на сервер
+    // Например, с помощью fetch или XMLHttpRequest
 
-document.getElementById('message-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const messageInput = document.getElementById('message-input');
-    sendMessage(messageInput.value);
-    messageInput.value = ''; // Очистка поля ввода
+    // Для демонстрации добавим сообщение в чат
+    const message = {
+        ID: Date.now(), // Используем временную метку как ID
+        ChatID: 1, // Пример ID чата
+        UserID: "user123", // Пример ID пользователя
+        Content: messageContent,
+        CreatedAt: new Date()
+    };
+
+    renderMessage(message);
+    messageInput.value = ""; // Очистить поле ввода
 });
 
-function sendMessage(content) {
-    fetch(`/api/messages/${chatID}/${userID}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: content }) // Не передаем chat_id и user_id в теле запроса
-    })
-    .then(response => response.json())
-    .then(data => {
-        addMessageToChat(data);
-    });
+function renderMessage(message) {
+    const messagesDiv = document.getElementById("messages");
+    const messageDiv = document.createElement("div");
+    messageDiv.classList.add("message");
+    messageDiv.innerHTML = `<span class="user">${message.UserID}</span>: ${message.Content} <small>${new Date(message.CreatedAt).toLocaleTimeString()}</small>`;
+    messagesDiv.appendChild(messageDiv);
 }
-
-function fetchMessages() {
-    fetch(`/api/messages/${chatID}`)
-    .then(response => response.json())
-    .then(messages => {
-        messages.forEach(message => addMessageToChat(message));
-    });
-}
-
-// Загрузка сообщений при загрузке страницы
-fetchMessages();
