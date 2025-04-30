@@ -48,8 +48,8 @@ func main() {
 	e.Renderer = &TemplateRenderer{
 		templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
-	e.Use(functions.AuthMiddleware)
-	e.Use(functions.RecoverMiddleware)
+	e.Use(functionsChat.AuthMiddleware)
+	e.Use(functionsChat.RecoverMiddleware)
 
 	e.GET("/", functions.StartPage)
 	e.GET("/home-page", functionsdb.SeeTweets)
@@ -63,8 +63,8 @@ func main() {
 	e.GET("/follow-page", functions.FollowPage)
 	e.GET("/view-subscrives", functionsdb.ViewAllSubscribe)
 	e.GET("/api/messages/:chat_id", functionsChat.GetMessages)
-	e.POST("/chat/:chat_id/user/:user_id/message", functionsChat.PostMessage)
-	e.GET("/get-chats", functions.GetChats)
+	e.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
+	e.GET("/get-chats", functionsChat.GetChats)
 
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)

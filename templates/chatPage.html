@@ -103,15 +103,37 @@
                 <li>
                     <strong>{{.Username}}</strong> <!-- Имя пользователя -->
                     <div class="content">{{.Content}}</div> <!-- Содержимое сообщения -->
-                    <div class="timestamp">{{.CreatedAt}}</div> <!-- Время отправки -->
                 </li>
                 {{end}}
             </ul>
         </div>
-        <form method="post" action="/chat/{{.ChatID}}/user/{{.UserID}}/message">
+        <form method="post" action="/api/messages/{{.ChatID}}/user/{{.UserID}}">
             <input type="text" id="message-input" name="message" placeholder="Введите ваше сообщение" required />
             <button type="submit">Отправить</button>
         </form>
     </div>
 </body>
 </html>
+
+<!-- type Chat struct {
+	ChatID    int    `json:"chat_id"`
+	UserID1   int    `json:"user_id1"`
+	UserID2   int    `json:"user_id2"`
+	UserName1 string `json:"username1"`
+	UserName2 string `json:"username2"`
+} -->
+
+<!-- type Message struct {
+	ID        int    `json:"ID"`
+	ChatID    int    `json:"chat_id"`
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"send_time"`
+} -->
+<!-- 
+type ChatPageData struct {
+	ChatID   int
+	UserID   string
+	Messages []Message
+} -->
