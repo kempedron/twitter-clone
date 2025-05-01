@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чаты</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f8fa;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #1da1f2;
+            text-align: center;
+        }
+
+        .chat-list {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid #e1e8ed;
+            transition: background-color 0.2s;
+        }
+
+        .chat-item:last-child {
+            border-bottom: none;
+        }
+
+        .chat-item:hover {
+            background-color: #f0f8ff;
+        }
+
+        .chat-button {
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .chat-button:hover {
+            background-color: #0d95e8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ваши чаты</h1>
+    <div class="chat-list">
+        {{range .}}
+            <div class="chat-item">
+                <span>{{.UserName2}}</span>
+                <form action="/" method="get">
+                    <button type="submit" class="chat-button">Открыть</button>
+                </form>
+            </div>
+        {{end}}
+    </div>
+</body>
+</html>
+
+<!-- type Chat struct {
+	ChatID    int    `json:"chat_id"`
+	UserID1   int    `json:"user_id1"`
+	UserID2   int    `json:"user_id2"`
+	UserName1 string `json:"username1"`
+	UserName2 string `json:"username2"`
+} -->

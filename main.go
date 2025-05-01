@@ -11,6 +11,7 @@ import (
 	functionsChat "twitter/chat"
 	"twitter/functions"
 	functionsdb "twitter/functionsDB"
+	"twitter/functionsGroups"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -22,7 +23,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var clients = make(map[*websocket.Conn]bool)
+var clients = make(map[string]map[*websocket.Conn]bool) // map[chatID]map[conn]bool
 var mu sync.Mutex
 
 type TemplateRenderer struct {
@@ -53,10 +54,10 @@ func main() {
 
 	e.GET("/", functions.StartPage)
 	e.GET("/home-page", functionsdb.SeeTweets)
-	e.GET("/login-page", functions.LoginPage)
-	e.POST("/login-method", functionsdb.LogIn)
-	e.GET("/register-page", functions.RegisterPage)
-	e.POST("/register-new-user", functionsdb.RegisterNewUser)
+	e.GET("/login", functions.LoginPage)
+	e.POST("/login", functionsdb.LogIn)
+	e.GET("/register", functions.RegisterPage)
+	e.POST("/register", functionsdb.RegisterNewUser)
 	e.GET("/search-users", functions.PageForSearch) // Страница поиска пользователей
 	e.POST("/search-method", functionsdb.SearchUsers)
 	e.POST("/follow-method", functionsdb.Follow)
@@ -65,6 +66,9 @@ func main() {
 	e.GET("/api/messages/:chat_id", functionsChat.GetMessages)
 	e.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
 	e.GET("/get-chats", functionsChat.GetChats)
+	e.POST("/create-new-group", functionsGroups.CreateNewGroup)
+	e.GET("/create-new-group", functions.CreateGroupPage)
+	
 
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)
@@ -76,35 +80,56 @@ func main() {
 func WebSocketHandler(c echo.Context) error {
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
-		return err
+		log.Println("Ошибка при обновлении соединения:", err)
+		return c.String(http.StatusInternalServerError, "Ошибка при подключении WebSocket")
 	}
 	defer conn.Close()
 
+	// Получаем chat_id из query параметров
+	chatID := c.QueryParam("chat_id")
+	if chatID == "" {
+		log.Println("chat_id is required")
+		return c.String(http.StatusBadRequest, "chat_id is required")
+	}
+
+	// Регистрируем соединение
 	mu.Lock()
-	clients[conn] = true
+	if clients[chatID] == nil {
+		clients[chatID] = make(map[*websocket.Conn]bool)
+	}
+	clients[chatID][conn] = true
 	mu.Unlock()
 
+	// Обработка входящих сообщений
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
+			log.Println("Ошибка чтения сообщения:", err)
 			mu.Lock()
-			delete(clients, conn)
+			delete(clients[chatID], conn)
 			mu.Unlock()
 			break
 		}
 
-		// Преобразование []byte в string
-		messageString := string(msg)
-
-		// Широковещательная рассылка сообщения всем подключенным клиентам
-		mu.Lock()
-		for client := range clients {
-			if err := client.WriteMessage(websocket.TextMessage, []byte(messageString)); err != nil {
-				client.Close()
-				delete(clients, client)
-			}
-		}
-		mu.Unlock()
+		// Обработка и сохранение сообщения
+		handleIncomingMessage(chatID, msg, conn)
 	}
 	return nil
+}
+
+func handleIncomingMessage(chatID string, msg []byte, sender *websocket.Conn) {
+	// Здесь можно добавить логику сохранения сообщения в БД
+	// и рассылки его всем участникам чата
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	for conn := range clients[chatID] {
+		if conn != sender { // Отправляем всем, кроме отправителя
+			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				conn.Close()
+				delete(clients[chatID], conn)
+			}
+		}
+	}
 }

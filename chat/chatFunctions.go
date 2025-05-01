@@ -2,18 +2,25 @@ package functionsChat
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	db "twitter/DataBase"
 
 	"github.com/gorilla/sessions"
+	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
 )
+
+var clients = make(map[string]map[*websocket.Conn]bool) // map[chatID]map[conn]bool
+var mu sync.Mutex
+var Store = sessions.NewCookieStore([]byte("secret-key"))
 
 type Message struct {
 	ID        int    `json:"ID"`
@@ -22,6 +29,15 @@ type Message struct {
 	Username  string `json:"username"`
 	Content   string `json:"content"`
 	CreatedAt string `json:"send_time"`
+}
+
+// структура для чата
+type Chat struct {
+	ChatID    int    `json:"chat_id"`
+	UserID1   int    `json:"user_id1"`
+	UserID2   int    `json:"user_id2"`
+	UserName1 string `json:"username1"`
+	UserName2 string `json:"username2"`
 }
 
 type ChatPageData struct {
@@ -174,15 +190,6 @@ func GetMessages(c echo.Context) error {
 	return c.Render(http.StatusOK, "chatPage.html", chatData)
 }
 
-// структура для чата
-type Chat struct {
-	ChatID    int    `json:"chat_id"`
-	UserID1   int    `json:"user_id1"`
-	UserID2   int    `json:"user_id2"`
-	UserName1 string `json:"username1"`
-	UserName2 string `json:"username2"`
-}
-
 func GetChatsByUsername(username string) ([]Chat, error) {
 	db := db.Get()
 
@@ -219,6 +226,8 @@ func GetChatsByUsername(username string) ([]Chat, error) {
 	return chats, nil
 }
 
+// functionsChat/functionsChat.go
+
 func PostMessage(c echo.Context) error {
 	db := db.Get()
 	if db == nil {
@@ -230,20 +239,7 @@ func PostMessage(c echo.Context) error {
 	userIDStr := c.Param("user_id")
 	content := strings.TrimSpace(c.FormValue("message"))
 
-	// Логирование для отладки
-	log.Printf("Получены параметры - chat_id: '%s', user_id: '%s', content: '%s'",
-		chatIDStr, userIDStr, content)
-
-	// Валидация
-	if chatIDStr == "" || userIDStr == "" {
-		return c.String(http.StatusBadRequest, "ID чата и пользователя обязательны")
-	}
-
-	if content == "" {
-		return c.String(http.StatusBadRequest, "Сообщение не может быть пустым")
-	}
-
-	// Преобразование ID
+	// Валидация и преобразование параметров
 	chatID, err := strconv.Atoi(chatIDStr)
 	if err != nil || chatID <= 0 {
 		return c.String(http.StatusBadRequest, "Неверный ID чата")
@@ -254,31 +250,44 @@ func PostMessage(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Неверный ID пользователя")
 	}
 
-	// Проверка существования пользователя
+	// Получаем username
 	var username string
 	err = db.QueryRow("SELECT username FROM users WHERE id = $1", userID).Scan(&username)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.String(http.StatusNotFound, "Пользователь не найден")
-		}
-		log.Printf("Ошибка проверки пользователя: %v", err)
-		return c.String(http.StatusInternalServerError, "Ошибка сервера")
+		return c.String(http.StatusNotFound, "Пользователь не найден")
 	}
 
-	// Вставка сообщения
-	query := `INSERT INTO messages(chat_id, user_id, content) VALUES ($1, $2, $3) RETURNING id`
-	var insertedID int
-	err = db.QueryRow(query, chatID, userID, content).Scan(&insertedID)
-	if err != nil {
-		log.Printf("Ошибка вставки сообщения: %v", err)
+	// Создаем сообщение
+	msg := Message{
+		ChatID:   chatID,
+		UserID:   strconv.Itoa(userID),
+		Username: username,
+		Content:  content,
+	}
+
+	// Сохраняем в БД
+	if err := WriteMessageByID(msg); err != nil {
 		return c.String(http.StatusInternalServerError, "Ошибка сохранения сообщения")
 	}
 
-	log.Printf("Сообщение сохранено: ID=%d, chatID=%d, userID=%d", insertedID, chatID, userID)
+	// Формируем JSON для отправки через WebSocket
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("Ошибка маршалинга сообщения: %v", err)
+	} else {
+		// Отправляем через WebSocket всем подписчикам этого чата
+		mu.Lock()
+		for conn := range clients[chatIDStr] {
+			if err := conn.WriteMessage(websocket.TextMessage, msgJSON); err != nil {
+				conn.Close()
+				delete(clients[chatIDStr], conn)
+			}
+		}
+		mu.Unlock()
+	}
+
 	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/api/messages/%d", chatID))
 }
-
-var Store = sessions.NewCookieStore([]byte("secret-key"))
 
 func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {

@@ -93,16 +93,24 @@
         button:hover {
             background-color: #0d8bf2; /* Темный цвет при наведении */
         }
+        .timestamp {
+            position: absolute; /* Абсолютное позиционирование для времени */
+            bottom: 5px; /* Отступ снизу */
+            right: 10px; /* Отступ справа */
+            font-size: 12px; /* Размер шрифта для времени */
+            color: #657786; /* Цвет для времени */
+        }
     </style>
 </head>
 <body>
     <div id="chat">
         <div id="messages">
             <ul>
-                {{range .Messages}} <!-- Здесь мы итерируемся по массиву сообщений -->
+                {{range .Messages}} 
                 <li>
-                    <strong>{{.Username}}</strong> <!-- Имя пользователя -->
-                    <div class="content">{{.Content}}</div> <!-- Содержимое сообщения -->
+                    <strong>{{.Username}}</strong> 
+                    <div class="content">{{.Content}}</div>
+                    <div class="timestamp">{{.CreatedAt}}</div>
                 </li>
                 {{end}}
             </ul>
