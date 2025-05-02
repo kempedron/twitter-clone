@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чаты</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f8fa;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #1da1f2;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .chat-list {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-item {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            border-bottom: 1px solid #e1e8ed;
+            transition: background-color 0.2s;
+            position: relative;
+        }
+
+        .chat-item:last-child {
+            border-bottom: none;
+        }
+
+        .chat-item:hover {
+            background-color: #f0f8ff;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .group-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .group-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .subscribes {
+            font-size: 11px;
+            color: #657786;
+            margin-top: 2px;
+        }
+
+        .chat-button {
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 13px;
+        }
+
+        .chat-button:hover {
+            background-color: #0d95e8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ваши группы</h1>
+    <div class="chat-list">
+        {{range .}}
+        <div class="chat-item">
+            <div class="group-header">
+            <span class="group-name">{{.GroupName}}</span>
+                <form action="/view-group/{{.ID}}" method="get">
+                    <button class="chat-button">Открыть</button>
+                </form>
+            </div>
+            <div class="group-footer">
+                <span class="subscribes">{{.MemberCount}} подписчиков</span>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>
+
+<!-- type ForGroupList struct {
+    ID               int
+    OwnerID          int
+    GroupName        string
+    GroupDescription string
+    MemberCount      int
+} -->

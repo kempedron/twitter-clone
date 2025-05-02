@@ -56,27 +56,25 @@
         .chat-button:hover {
             background-color: #0d95e8;
         }
+
+        .no-groups {
+            color: #ff0000;
+            text-align: center;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <h1>Ваши чаты</h1>
+    <h1>Ваши группы</h1>
     <div class="chat-list">
-        {{range .}}
-            <div class="chat-item">
-                <span>{{.UserName2}}</span>
-                <form action="/" method="get">
-                    <button type="submit" class="chat-button">Открыть</button>
-                </form>
-            </div>
-        {{end}}
+            {{range .}}
+                <div class="chat-item">
+                    <span>{{.ID}}: {{.GroupName}}</span>
+                    <form action="#" method="get">
+                        <button type="submit" class="chat-button">Открыть</button>
+                    </form>
+                </div>
+            {{end}}
     </div>
 </body>
 </html>
-
-<!-- type Chat struct {
-	ChatID    int    `json:"chat_id"`
-	UserID1   int    `json:"user_id1"`
-	UserID2   int    `json:"user_id2"`
-	UserName1 string `json:"username1"`
-	UserName2 string `json:"username2"`
-} -->

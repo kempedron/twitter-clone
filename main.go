@@ -68,7 +68,11 @@ func main() {
 	e.GET("/get-chats", functionsChat.GetChats)
 	e.POST("/create-new-group", functionsGroups.CreateNewGroup)
 	e.GET("/create-new-group", functions.CreateGroupPage)
-	
+	e.GET("/get-groups-for-user", functionsGroups.ViewGroupsForUser)
+	e.GET("/get-all-groups", functionsGroups.GetAllGroups)
+	e.GET("/view-group/:group-id", functionsGroups.FuncForGroup)
+	e.POST("/subscribe/group/:group-id", functionsGroups.SubscribeOnGroup)
+	e.POST("/add-post-in-group/:group-id", functionsGroups.AddPostInGroup)
 
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)
