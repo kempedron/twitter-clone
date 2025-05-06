@@ -161,40 +161,68 @@ func RegisterNewUser(c echo.Context) error {
 		return c.String(http.StatusConflict, "пользователь с таким именим уже зарегистрирован")
 	}
 
-	return c.Redirect(http.StatusSeeOther, "/home-page")
+	return c.Redirect(http.StatusSeeOther, "/login")
 }
 
 func SearchUsers(c echo.Context) error {
 	db := db.Get()
 
+	session, err := store.Get(c.Request(), "session")
+	if err != nil {
+		log.Printf("Ошибка при получении сессии: %v", err)
+		return c.String(http.StatusInternalServerError, "Ошибка сервера")
+	}
+
+	youUsername, ok := session.Values["username"].(string)
+	if !ok || youUsername == "" {
+		log.Println("Пользователь не авторизован")
+		return c.String(http.StatusUnauthorized, "необходимо войти")
+	}
+
 	username := c.FormValue("username")
 	log.Println("Получен юзернейм:", username)
-
-	rows, err := db.Query("SELECT username FROM users WHERE username=$1", username)
+	var storedUsername string
+	err = db.QueryRow("SELECT username FROM users WHERE username=$1", username).Scan(&storedUsername)
 	if err != nil {
 		log.Printf("Ошибка при выполнении запроса: %v", err)
 		return c.String(http.StatusInternalServerError, "внутренняя ошибка сервера")
 	}
-	defer rows.Close()
+	var youID, userID int
+	if err := db.QueryRow("SELECT id FROM users WHERE username=$1", username).Scan(&userID); err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
 
-	var users []User
-	for rows.Next() {
-		var user User
-		if err := rows.Scan(&user.Username); err != nil {
-			log.Printf("Ошибка при сканировании результата: %v", err)
-			return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
-		}
-		users = append(users, user)
-		err := rows.Err()
-		if err != nil {
+	if err := db.QueryRow("SELECT id FROM users WHERE username=$1", youUsername).Scan(&youID); err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
+	chatID, err := GetChatForButton(userID, youID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = db.QueryRow(`
+                INSERT INTO chats(user_id_1, user_id_2) 
+                VALUES($1, $2) 
+                RETURNING chat_id`,
+				youID, userID).Scan(&chatID)
+
+			if err != nil {
+				log.Println("Ошибка при создании чата:", err)
+				return c.String(http.StatusInternalServerError, "внутренняя ошибка сервера при создании чата")
+			}
+			log.Println("Создан новый чат с ID:", chatID)
+		} else {
+			log.Println("Ошибка при получении chatID:", err)
 			return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
 		}
 	}
 
-	if len(users) == 0 {
-		return c.String(http.StatusNotFound, "Пользователь не найден")
+	response := map[string]interface{}{
+		"chatID":   chatID,
+		"username": storedUsername,
 	}
-	return c.Render(http.StatusOK, "ListUsersPage.html", users)
+
+	return c.Render(http.StatusOK, "ListUsersPage.html", response)
 }
 
 func Follow(c echo.Context) error {
@@ -318,4 +346,17 @@ func CreateNewPost(c echo.Context) error {
 
 func CreateNewPostPage(c echo.Context) error {
 	return c.File("templates/AddTweetForUser.html")
+}
+
+func GetChatForButton(userID1, userID2 int) (int, error) {
+	db := db.Get()
+	query := `SELECT chat_id FROM chats
+	WHERE (user_id_1=$1 AND user_id_2=$2) OR (user_id_1=$2 AND user_id_2=$1)`
+	var chatID int
+	err := db.QueryRow(query, userID1, userID2).Scan(&chatID)
+	if err != nil {
+		log.Println(err)
+		return 0, err
+	}
+	return chatID, nil
 }

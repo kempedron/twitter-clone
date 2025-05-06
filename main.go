@@ -37,37 +37,43 @@ func main() {
 	e.Renderer = &TemplateRenderer{
 		templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
-	e.Use(functionsChat.AuthMiddleware)
-	e.Use(functionsChat.RecoverMiddleware)
 
-	e.GET("/", functions.StartPage)
-	e.GET("/home-page", functionsdb.SeeTweets)
-	e.GET("/login", functions.LoginPage)
-	e.POST("/login", functionsdb.LogIn)
-	e.GET("/register", functions.RegisterPage)
-	e.POST("/register", functionsdb.RegisterNewUser)
-	e.GET("/search-users", functions.PageForSearch) // Страница поиска пользователей
-	e.POST("/search-method", functionsdb.SearchUsers)
-	e.POST("/follow-method", functionsdb.Follow)
-	e.GET("/follow-page", functions.FollowPage)
-	e.GET("/view-subscrives", functionsdb.ViewAllSubscribe)
-	e.GET("/api/messages/:chat_id", functionsChat.GetMessages)
-	e.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
-	e.GET("/get-chats", functionsChat.GetChats)
-	e.POST("/create-new-group", functionsGroups.CreateNewGroup)
-	e.GET("/create-new-group", functions.CreateGroupPage)
-	e.GET("/get-groups-for-user", functionsGroups.ViewGroupsForUser)
-	e.GET("/get-all-groups", functionsGroups.GetAllGroups)
-	e.GET("/view-group/:group-id", functionsGroups.FuncForViewGroup)
-	e.POST("/subscribe/group/:group-id", functionsGroups.SubscribeOnGroup)
-	e.POST("/add-post-in-group/:group-id", functionsGroups.AddPostInGroup)
-	e.GET("/add-post-in-group/:group-id", functionsGroups.AddPostInGroupPage)
-	e.GET("/create-new-post", functionsdb.CreateNewPostPage)
-	e.POST("/create-new-post", functionsdb.CreateNewPost)
+	// Публичные маршруты (без middleware)
+	public := e.Group("")
+	public.GET("/", functions.StartPage)
+	public.GET("/login", functions.LoginPage)
+	public.POST("/login", functionsdb.LogIn)
+	public.GET("/register", functions.RegisterPage)
+	public.POST("/register", functionsdb.RegisterNewUser)
+
+	// Приватные маршруты (с middleware)
+	private := e.Group("")
+	private.Use(functionsChat.AuthMiddleware)
+	private.Use(functionsChat.RecoverMiddleware)
+
+	private.GET("/home-page", functionsdb.SeeTweets)
+	private.GET("/search-users", functions.PageForSearch) // Страница поиска пользователей
+	private.POST("/search-method", functionsdb.SearchUsers)
+	private.POST("/follow-method", functionsdb.Follow)
+	private.GET("/follow-page", functions.FollowPage)
+	private.GET("/view-subscrives", functionsdb.ViewAllSubscribe)
+	private.GET("/api/messages/:chat_id", functionsChat.GetMessages)
+	private.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
+	private.GET("/get-chats", functionsChat.GetChats)
+	private.POST("/create-new-group", functionsGroups.CreateNewGroup)
+	private.GET("/create-new-group", functions.CreateGroupPage)
+	private.GET("/get-groups-for-user", functionsGroups.ViewGroupsForUser)
+	private.GET("/get-all-groups", functionsGroups.GetAllGroups)
+	private.GET("/view-group/:group-id", functionsGroups.FuncForViewGroup)
+	private.POST("/subscribe/group/:group-id", functionsGroups.SubscribeOnGroup)
+	private.POST("/add-post-in-group/:group-id", functionsGroups.AddPostInGroup)
+	private.GET("/add-post-in-group/:group-id", functionsGroups.AddPostInGroupPage)
+	private.GET("/create-new-post", functionsdb.CreateNewPostPage)
+	private.POST("/create-new-post", functionsdb.CreateNewPost)
+
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)
 		log.Fatal(err)
-
 	}
 }
 

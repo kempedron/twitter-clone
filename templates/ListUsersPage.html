@@ -94,6 +94,17 @@
             margin-top: 30px; /* Отступ сверху для поднятия надписи */
             font-size: 1.5em; /* Увеличение размера шрифта, если нужно */
         }
+        .message-button {
+            background-color: #1da1f2;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .message-button:hover {
+            background-color: #0d95e8;
+        }
     </style>
 </head>
 <body>
@@ -119,11 +130,13 @@
     </div>
     <div class="container">
     <h1>Результаты поиска</h1>
-    {{if .}}
+    {{if .chatID}}
         <ul>
-            {{range .}}
-                <li>{{.Username}}</li>
-            {{end}}
+                <li>Найден пользователь: <span class="username">{{.username}}</span>
+                </li>
+                <button class="message-button">
+                    <a href="/api/messages/{{.chatID}}" style="color: white; text-decoration: none;">Написать сообщение</a>
+                </button>
         </ul>
     {{else}}
         <p class="no-users">Пользователи не найдены.</p>

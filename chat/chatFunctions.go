@@ -360,3 +360,4 @@ func GetChats(c echo.Context) error {
 
 	return nil
 }
+
