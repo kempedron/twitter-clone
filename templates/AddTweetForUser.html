@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новый пост | Социальная сеть</title>
+    <style>
+        :root {
+            --primary-color: #1DA1F2;
+            --background-color: #f5f8fa;
+            --card-color: #ffffff;
+            --text-color: #14171a;
+            --border-color: #e6ecf0;
+            --secondary-text: #657786;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .back-button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            margin-right: 20px;
+            cursor: pointer;
+            color: var(--primary-color);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .post-card {
+            background-color: var(--card-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--secondary-text);
+            font-size: 14px;
+        }
+
+        .title-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .content-input {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .post-actions {
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .post-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 24px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background 0.2s;
+        }
+
+        .post-button:hover {
+            background-color: #1991db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-button">←</button>
+            <h1>Новый пост в группе</h1>
+        </div>
+        <form action="/create-new-post" method="post">
+        <div class="post-card">
+            <div class="input-group">
+                <label for="postTitle" class="input-label">Заголовок</label>
+                <input type="text" id="postTitle" class="title-input" name="postTitle" 
+                       placeholder="Введите заголовок поста" maxlength="100" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="postContent" class="input-label">Содержание</label>
+                <textarea id="postContent" class="content-input" name="postContent" 
+                          placeholder="Напишите содержание поста" required></textarea>
+            </div>
+
+            <div class="post-actions">
+                    <input type="hidden" name="group_id" value="{{.groupID}}">
+                    <button type="submit" class="post-button">Опубликовать</button>
+            </div>
+        </div>
+    </form>
+    </div>
+</body>
+</html>

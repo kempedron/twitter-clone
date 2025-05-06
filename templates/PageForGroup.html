@@ -164,8 +164,9 @@
             </div>
             
             <div class="group-actions">
-                <button class="btn btn-primary">Вступить</button>
-                <button class="btn btn-outline">Пригласить</button>
+                <form action="/subscribe/group/{{.ID}}" method="post">    
+                    <button class="btn btn-primary">Вступить</button>
+                </form>
             </div>
         </div>
         

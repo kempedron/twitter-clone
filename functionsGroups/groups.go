@@ -1,7 +1,10 @@
 package functionsGroups
 
 import (
+	"bytes"
 	"database/sql"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	db "twitter/DataBase"
@@ -219,7 +222,7 @@ func SubscribeOnGroup(c echo.Context) error {
 	return c.String(http.StatusOK, "вы успешно подписались")
 }
 
-func FuncForGroup(c echo.Context) error {
+func FuncForViewGroup(c echo.Context) error {
 	db := db.Get()
 	groupID := c.Param("group-id")
 
@@ -332,5 +335,82 @@ func FuncForGroup(c echo.Context) error {
 	return nil
 }
 func AddPostInGroup(c echo.Context) error {
+	if c.Request().Method != http.MethodPost {
+		return c.String(http.StatusMethodNotAllowed, "метод не разрешен")
+	}
+	db := db.Get()
+
+
+	// Логируем заголовки запроса
+	log.Println("Заголовки запроса:", c.Request().Header)
+
+	// Логируем тело запроса
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		log.Println("Ошибка чтения тела запроса:", err)
+	} else {
+		log.Println("Тело запроса:", string(body))
+		// Восстанавливаем тело для дальнейшего чтения
+		c.Request().Body = io.NopCloser(bytes.NewReader(body))
+	}
+
+	// Получаем значения из формы
+	postTitle := c.FormValue("postTitle")
+	postContent := c.FormValue("postContent")
+	
+	groupID := c.Param("group-id")
+
+	log.Printf("Полученные данные: title='%s', content='%s', groupID='%s'",
+		postTitle, postContent, groupID)
+
+	session, err := Store.Get(c.Request(), "session")
+	if err != nil {
+		log.Println("Ошибка при получении сессии:", err)
+		return c.String(http.StatusInternalServerError, "Ошибка сессии")
+	}
+	log.Println("title:", postTitle, "content:", postContent)
+
+	username, ok := session.Values["username"].(string)
+	if !ok || username == "" {
+		return c.Redirect(http.StatusFound, "/login")
+	}
+	var userID int
+	var isAdmin bool
+	err = db.QueryRow("SELECT id FROM users WHERE username=$1", username).Scan(&userID)
+	if err != nil {
+		log.Println("error in line 350(get id for user):", err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
+	err = db.QueryRow("SELECT EXISTS (SELECT 1 FROM groups_admin WHERE admin_id=$1)", userID).Scan(&isAdmin)
+	if err != nil {
+		log.Println("err in line 363(check-admin query):", err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
+	if !isAdmin {
+		return c.String(http.StatusInternalServerError, "извините,похоже у вас недостаточно прав для добавления постов")
+	}
+	_, err = db.Exec(`INSERT INTO 
+	group_post(post_title, post_content, group_id, creator_id)
+	VALUES($1,$2,$3,$4)`, postTitle, postContent, groupID, userID)
+	if err != nil {
+		log.Println("err in line 373(add post):", err)
+		return c.String(http.StatusInternalServerError, "внутрення ошибка на стороне сервера")
+	}
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/view-group/%s", groupID))
+}
+
+func AddPostInGroupPage(c echo.Context) error {
+
+	groupID := c.Param("group-id")
+	log.Println(groupID)
+
+	data := map[string]interface{}{
+		"groupID": groupID,
+	}
+	err := c.Render(http.StatusOK, "AddPostPage.html", data)
+	if err != nil {
+		log.Println("rendering error in line 382:", err)
+		return err
+	}
 	return nil
 }

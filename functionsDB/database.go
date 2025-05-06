@@ -19,6 +19,8 @@ type User struct {
 	Password string
 }
 
+var Store = sessions.NewCookieStore([]byte("secret-key"))
+
 type Post struct {
 	PostId       int
 	AuthID       int
@@ -280,4 +282,40 @@ func ViewAllSubscribe(c echo.Context) error {
 	log.Println(len(users))
 	return c.Render(http.StatusOK, "viewSubscribes.html", users)
 
+}
+
+func CreateNewPost(c echo.Context) error {
+	if c.Request().Method != http.MethodPost {
+		log.Println("неверный метод")
+		return c.String(http.StatusMethodNotAllowed, "неверный метод запроса")
+	}
+	db := db.Get()
+	postTitle := c.FormValue("postTitle")
+	postContent := c.FormValue("postContent")
+
+	session, err := Store.Get(c.Request(), "session")
+	if err != nil {
+		log.Println("Ошибка при получении сессии:", err)
+		return c.String(http.StatusInternalServerError, "Ошибка сессии")
+	}
+	username, ok := session.Values["username"].(string)
+	if !ok || username == "" {
+		return c.Redirect(http.StatusFound, "/login")
+	}
+	var userID int
+	err = db.QueryRow("SELECT id FROM users WHERE username=$1", username).Scan(&userID)
+	if err != nil {
+		log.Println("error(db.go):", err)
+		return c.String(http.StatusInternalServerError, "внутренняя ошибка севера")
+	}
+	query := `INSERT INTO posts(user_id,post_title,post_content) VALUES($1,$2,$3)`
+	_, err = db.Exec(query, userID, postTitle, postContent)
+	if err != nil {
+		log.Println("error in INSERT query:", err)
+	}
+	return c.Redirect(http.StatusSeeOther, "/home-page")
+}
+
+func CreateNewPostPage(c echo.Context) error {
+	return c.File("templates/AddTweetForUser.html")
 }
