@@ -127,7 +127,6 @@ func SeeTweets(c echo.Context) error {
 	var posts []Post
 
 	for rows.Next() {
-		var post Post
 		if err := rows.Scan(&post.PostId, &post.AuthID, &post.Title, &post.Content, &post.PublicTime); err != nil {
 			return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
 		}
@@ -142,6 +141,8 @@ func SeeTweets(c echo.Context) error {
 	return c.Render(http.StatusOK, "index.html", posts)
 
 }
+
+var post Post
 
 func RegisterNewUser(c echo.Context) error {
 	db := db.Get()

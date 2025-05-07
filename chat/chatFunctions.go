@@ -108,15 +108,7 @@ func GetMessageByrID(chatID int) (ChatPageData, error) {
 		var msg Message
 		var userID int // Используем int для сканирования из БД
 
-		err := rows.Scan(
-			&msg.ID,
-			&msg.ChatID,
-			&userID,
-			&msg.Username,
-			&msg.Content,
-			&msg.CreatedAt,
-		)
-		log.Println("id:", userID)
+		err := rows.Scan(&msg.ID, &msg.ChatID, &userID, &msg.Username, &msg.Content, &msg.CreatedAt)
 
 		if err != nil {
 			log.Printf("Error scanning message: %v", err)
@@ -165,7 +157,6 @@ func GetMessages(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Неверный ID чата")
 	}
 
-	// Получаем user_id из сессии
 	session, _ := Store.Get(c.Request(), "session")
 	username, ok := session.Values["username"].(string)
 	if !ok {
@@ -215,8 +206,13 @@ func GetChatsByUsername(username string) ([]Chat, error) {
 	for rows.Next() {
 		var chat Chat
 		if err := rows.Scan(&chat.ChatID, &chat.UserID1, &chat.UserID2, &chat.UserName1, &chat.UserName2); err != nil {
-			log.Println(err)
 			return nil, err
+		}
+		if chat.UserName2 == username {
+			saveName2 := chat.UserName2
+			chat.UserName2 = chat.UserName1
+			chat.UserName1 = saveName2
+
 		}
 		chats = append(chats, chat)
 	}
@@ -361,3 +357,56 @@ func GetChats(c echo.Context) error {
 	return nil
 }
 
+func CheckUserInChatMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		// Получаем chat_id из URL
+		chatID := c.Param("chat_id")
+		if chatID == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Не указан ID чата",
+			})
+		}
+
+		// Получаем данные пользователя из сессии
+		sess, err := Store.Get(c.Request(), "session")
+		if err != nil {
+			log.Println("Ошибка сессии:", err)
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Ошибка сервера",
+			})
+		}
+
+		username, ok := sess.Values["username"].(string)
+		if !ok || username == "" {
+			return c.JSON(http.StatusUnauthorized, map[string]string{
+				"error": "Требуется авторизация",
+			})
+		}
+
+		// Проверяем доступ к конкретному чату
+		var exists bool
+		query := `
+            SELECT EXISTS(
+                SELECT 1 FROM chats 
+                WHERE chat_id = $1 AND 
+                      (user_id_1 = (SELECT id FROM users WHERE username = $2) OR 
+                       user_id_2 = (SELECT id FROM users WHERE username = $2))
+            )`
+
+		err = db.Get().QueryRow(query, chatID, username).Scan(&exists)
+		if err != nil {
+			log.Println("Ошибка БД:", err)
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Ошибка проверки доступа",
+			})
+		}
+
+		if !exists {
+			return c.JSON(http.StatusForbidden, map[string]string{
+				"error": "У вас нет доступа к этому чату",
+			})
+		}
+
+		return next(c)
+	}
+}

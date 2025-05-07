@@ -47,6 +47,11 @@ func main() {
 	public.POST("/register", functionsdb.RegisterNewUser)
 
 	// Приватные маршруты (с middleware)
+	chat := e.Group("")
+	chat.Use(functionsChat.CheckUserInChatMiddleware)
+	chat.GET("/api/messages/:chat_id", functionsChat.GetMessages)
+	chat.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
+
 	private := e.Group("")
 	private.Use(functionsChat.AuthMiddleware)
 	private.Use(functionsChat.RecoverMiddleware)
@@ -57,8 +62,6 @@ func main() {
 	private.POST("/follow-method", functionsdb.Follow)
 	private.GET("/follow-page", functions.FollowPage)
 	private.GET("/view-subscrives", functionsdb.ViewAllSubscribe)
-	private.GET("/api/messages/:chat_id", functionsChat.GetMessages)
-	private.POST("/api/messages/:chat_id/user/:user_id", functionsChat.PostMessage)
 	private.GET("/get-chats", functionsChat.GetChats)
 	private.POST("/create-new-group", functionsGroups.CreateNewGroup)
 	private.GET("/create-new-group", functions.CreateGroupPage)
@@ -77,68 +80,4 @@ func main() {
 	}
 }
 
-// func WebSocketHandler(c echo.Context) error {
-// 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
-// 	if err != nil {
-// 		log.Println("Ошибка при обновлении соединения:", err)
-// 		return c.String(http.StatusInternalServerError, "Ошибка при подключении WebSocket")
-// 	}
-// 	defer conn.Close()
-
-// 	// Получаем chat_id из query параметров
-// 	chatID := c.QueryParam("chat_id")
-// 	if chatID == "" {
-// 		log.Println("chat_id is required")
-// 		return c.String(http.StatusBadRequest, "chat_id is required")
-// 	}
-
-// 	// Регистрируем соединение
-// 	mu.Lock()
-// 	if clients[chatID] == nil {
-// 		clients[chatID] = make(map[*websocket.Conn]bool)
-// 	}
-// 	clients[chatID][conn] = true
-// 	mu.Unlock()
-
-// 	// Обработка входящих сообщений
-// 	for {
-// 		_, msg, err := conn.ReadMessage()
-// 		if err != nil {
-// 			log.Println("Ошибка чтения сообщения:", err)
-// 			mu.Lock()
-// 			delete(clients[chatID], conn)
-// 			mu.Unlock()
-// 			break
-// 		}
-
-// 		// Обработка и сохранение сообщения
-// 		handleIncomingMessage(chatID, msg, conn)
-// 	}
-// 	return nil
-// }
-
-// func handleIncomingMessage(chatID string, msg []byte, sender *websocket.Conn) {
-// 	// Здесь можно добавить логику сохранения сообщения в БД
-// 	// и рассылки его всем участникам чата
-
-// 	mu.Lock()
-// 	defer mu.Unlock()
-
-// 	for conn := range clients[chatID] {
-// 		if conn != sender { // Отправляем всем, кроме отправителя
-// 			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-// 				conn.Close()
-// 				delete(clients[chatID], conn)
-// 			}
-// 		}
-// 	}
-// }
-
-// var upgrader = websocket.Upgrader{
-// 	CheckOrigin: func(r *http.Request) bool {
-// 		return true
-// 	},
-// }
-
-// var clients = make(map[string]map[*websocket.Conn]bool) // map[chatID]map[conn]bool
-// var mu sync.Mutex
+// CheckUserInChatMiddleware проверяет, есть ли пользователь в чате
