@@ -22,7 +22,7 @@ type User struct {
 var Store = sessions.NewCookieStore([]byte("secret-key"))
 
 type Post struct {
-	PostId       int
+	PostID       int
 	AuthID       int
 	Title        string
 	Content      string
@@ -127,7 +127,7 @@ func SeeTweets(c echo.Context) error {
 	var posts []Post
 
 	for rows.Next() {
-		if err := rows.Scan(&post.PostId, &post.AuthID, &post.Title, &post.Content, &post.PublicTime); err != nil {
+		if err := rows.Scan(&post.PostID, &post.AuthID, &post.Title, &post.Content, &post.PublicTime); err != nil {
 			return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
 		}
 		posts = append(posts, post)
@@ -360,4 +360,23 @@ func GetChatForButton(userID1, userID2 int) (int, error) {
 		return 0, err
 	}
 	return chatID, nil
+}
+
+func DeleteTweet(c echo.Context) error {
+	db := db.Get()
+	tweetID := c.Param("tweet-id")
+	result, err := db.Exec("DELETE FROM posts WHERE post_id=$1", tweetID)
+	if err != nil {
+		log.Printf("ошибка при удалении твита: %s", err)
+	}
+	rowsAffect, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("ошибка при проверке удаленных строк: %s", err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
+	if rowsAffect == 0 {
+		log.Printf("ошибка,не найден твит с айди %s,error: %s", tweetID, err)
+	}
+	return c.Redirect(http.StatusSeeOther, "/home-page")
+
 }

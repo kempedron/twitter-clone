@@ -139,6 +139,9 @@
                 <div class="tweet">
                     <h2>{{.Title}}</h2>
                     <p>{{.Content}}</p>
+                    <form action="/delete-tweet/{{.PostID}}" method="post">
+                        <button type="submit">удалить пост</button>
+                    </form>
                     <small>Опубликовано: {{.PublicTime}}</small>
                 </div>
         {{end}}

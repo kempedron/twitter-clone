@@ -340,7 +340,6 @@ func AddPostInGroup(c echo.Context) error {
 	}
 	db := db.Get()
 
-
 	// Логируем заголовки запроса
 	log.Println("Заголовки запроса:", c.Request().Header)
 
@@ -357,7 +356,7 @@ func AddPostInGroup(c echo.Context) error {
 	// Получаем значения из формы
 	postTitle := c.FormValue("postTitle")
 	postContent := c.FormValue("postContent")
-	
+
 	groupID := c.Param("group-id")
 
 	log.Printf("Полученные данные: title='%s', content='%s', groupID='%s'",
@@ -413,4 +412,26 @@ func AddPostInGroupPage(c echo.Context) error {
 		return err
 	}
 	return nil
+}
+
+func DeletePost(c echo.Context) error {
+	db := db.Get()
+	postID := c.Param("post-id")
+	groupID := c.Param("group-id")
+	if postID == "" {
+		log.Printf("пустой postID, err")
+	}
+	result, err := db.Exec("DELETE FROM group_post WHERE post_id=$1", postID)
+	if err != nil {
+		log.Printf("ошибка при удалении поста: %s", err)
+	}
+	rowsAffect, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("ошибка при проверке удаленных строк: %s", err)
+		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+	}
+	if rowsAffect == 0 {
+		log.Printf("ошибка,не найден пост с айди %s,error: %s", postID, err)
+	}
+	return c.Redirect(http.StatusSeeOther, "/view-group/"+groupID)
 }

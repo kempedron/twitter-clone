@@ -56,6 +56,8 @@ func main() {
 	private.Use(functionsChat.AuthMiddleware)
 	private.Use(functionsChat.RecoverMiddleware)
 
+	private.POST("/delete-tweet/:tweet-id", functionsdb.DeleteTweet)
+	private.POST("/delete-group-post/:group-id/:post-id", functionsGroups.DeletePost)
 	private.GET("/home-page", functionsdb.SeeTweets)
 	private.GET("/search-users", functions.PageForSearch) // Страница поиска пользователей
 	private.POST("/search-method", functionsdb.SearchUsers)
