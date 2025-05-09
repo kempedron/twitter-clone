@@ -367,7 +367,6 @@ func CheckUserInChatMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			})
 		}
 
-		// Получаем данные пользователя из сессии
 		sess, err := Store.Get(c.Request(), "session")
 		if err != nil {
 			log.Println("Ошибка сессии:", err)
@@ -409,4 +408,173 @@ func CheckUserInChatMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		return next(c)
 	}
+}
+
+type GroupChat struct {
+	GroupChatID   int
+	MemberID      int
+	GroupChatName string
+}
+
+func ViewAllChatGroup(c echo.Context) error {
+	db := db.Get()
+
+	sess, err := Store.Get(c.Request(), "session")
+	if err != nil {
+		log.Println("Ошибка сессии:", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Ошибка сервера",
+		})
+	}
+
+	username, ok := sess.Values["username"].(string)
+	if !ok || username == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Требуется авторизация",
+		})
+	}
+	query := `SELECT g.group_chat_id, g.member_id, info.chat_group_name
+	FROM group_chat g
+	INNER JOIN info_for_chatgroup info ON g.group_chat_id = info.chat_group_id
+	WHERE g.member_id = (SELECT id FROM users WHERE username=$1)`
+	rows, err := db.Query(query, username)
+	if err != nil {
+		log.Printf("ошибка при получении групповых чатов: %s", err)
+		return c.String(http.StatusInternalServerError, "ошибка при получении групповых-чатов")
+	}
+	defer rows.Close()
+
+	var groupChats []GroupChat
+	for rows.Next() {
+		var groupChat GroupChat
+		err := rows.Scan(&groupChat.GroupChatID, &groupChat.MemberID, &groupChat.GroupChatName)
+		if err != nil {
+			log.Printf("ошибка при сканировании данных для групповых чатов: %s", err)
+			return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
+		}
+		groupChats = append(groupChats, groupChat)
+	}
+	//return c.String(http.StatusOK,"322")
+	return c.Render(http.StatusOK, "ViewAllChatGroups.html", groupChats)
+
+}
+
+func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
+	db := db.Get()
+	if db == nil {
+		return ChatPageData{}, errors.New("database connection is not initialized")
+	}
+
+	data := ChatPageData{
+		ChatID:   chatID,
+		Messages: []Message{},
+	}
+
+	// Получаем user_id из первого сообщения в чате (если есть)
+	var userID int
+	err := db.QueryRow(`
+        SELECT user_id FROM messages_gch
+        WHERE chat_id = $1 
+        LIMIT 1`, chatID).Scan(&userID)
+
+	// Обрабатываем случай, когда чат существует, но без сообщений
+	if err == sql.ErrNoRows {
+		return data, nil
+	}
+	if err != nil {
+		log.Printf("Error getting user_id: %v", err)
+		return ChatPageData{}, fmt.Errorf("error getting chat info: %v", err)
+	}
+
+	// Получаем username (если user_id найден)
+	var username string
+	err = db.QueryRow(`
+        SELECT username FROM users 
+        WHERE id = $1`, userID).Scan(&username)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error getting username: %v", err)
+		return ChatPageData{}, fmt.Errorf("error getting user info: %v", err)
+	}
+
+	// Получаем все сообщения чата
+	rows, err := db.Query(`
+        SELECT 
+            m.id, 
+            m.chat_id, 
+            m.user_id, 
+            u.username, 
+            m.content, 
+            TO_CHAR(m.created_at, 'DD Mon YYYY HH24:MI:SS') AS formatted_time 
+        FROM messages_gch m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.chat_id = $1 
+        ORDER BY m.created_at`, chatID)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error querying messages: %v", err)
+		return ChatPageData{}, fmt.Errorf("error getting messages: %v", err)
+	}
+	defer rows.Close()
+
+	// Собираем сообщения
+	for rows.Next() {
+		var msg Message
+		var userID int // Используем int для сканирования из БД
+
+		err := rows.Scan(&msg.ID, &msg.ChatID, &userID, &msg.Username, &msg.Content, &msg.CreatedAt)
+
+		if err != nil {
+			log.Printf("Error scanning message: %v", err)
+			continue // Пропускаем ошибочные записи
+		}
+
+		// Конвертируем userID в строку для структуры Message
+		msg.UserID = strconv.Itoa(userID)
+		data.Messages = append(data.Messages, msg)
+	}
+
+	// Проверяем ошибки итерации
+	if err = rows.Err(); err != nil {
+		log.Printf("Rows iteration error: %v", err)
+		return ChatPageData{}, fmt.Errorf("error processing messages: %v", err)
+	}
+
+	// Устанавливаем UserID для ChatPageData (как строку)
+	data.UserID = strconv.Itoa(userID)
+
+	return data, nil
+}
+
+func GetMessagesForCHatGroup(c echo.Context) error {
+	db := db.Get()
+
+	// Получаем chat_id из URL
+	chatIDStr := c.Param("chat-group-id")
+	chatID, err := strconv.Atoi(chatIDStr)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "Неверный ID чата")
+	}
+
+	session, _ := Store.Get(c.Request(), "session")
+	username, ok := session.Values["username"].(string)
+	if !ok {
+		return c.String(http.StatusUnauthorized, "Требуется авторизация")
+	}
+
+	var userID int
+	err = db.QueryRow("SELECT id FROM users WHERE username = $1", username).Scan(&userID)
+	if err != nil {
+		return c.String(http.StatusNotFound, "Пользователь не найден")
+	}
+
+	// Получаем данные чата
+	chatData, err := GetMessageByrIDForGCH(chatID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Ошибка загрузки чата")
+	}
+
+	// Устанавливаем UserID для шаблона
+	chatData.UserID = strconv.Itoa(userID)
+
+	return c.Render(http.StatusOK, "chatPage.html", chatData)
 }

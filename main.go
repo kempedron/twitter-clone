@@ -75,6 +75,8 @@ func main() {
 	private.GET("/add-post-in-group/:group-id", functionsGroups.AddPostInGroupPage)
 	private.GET("/create-new-post", functionsdb.CreateNewPostPage)
 	private.POST("/create-new-post", functionsdb.CreateNewPost)
+	private.GET("/chat-groups", functionsChat.ViewAllChatGroup)
+	private.GET("/view-chat-group/:chat-group-id", functionsChat.GetMessagesForCHatGroup)
 
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)
