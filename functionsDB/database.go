@@ -185,6 +185,10 @@ func SearchUsers(c echo.Context) error {
 	var storedUsername string
 	err = db.QueryRow("SELECT username FROM users WHERE username=$1", username).Scan(&storedUsername)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("err in Search: %s", err)
+			return c.String(http.StatusInternalServerError, "пользователь не найден")
+		}
 		log.Printf("Ошибка при выполнении запроса: %v", err)
 		return c.String(http.StatusInternalServerError, "внутренняя ошибка сервера")
 	}
@@ -195,7 +199,6 @@ func SearchUsers(c echo.Context) error {
 	}
 
 	if err := db.QueryRow("SELECT id FROM users WHERE username=$1", youUsername).Scan(&youID); err != nil {
-		log.Println(err)
 		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
 	}
 	chatID, err := GetChatForButton(userID, youID)
@@ -224,46 +227,6 @@ func SearchUsers(c echo.Context) error {
 	}
 
 	return c.Render(http.StatusOK, "ListUsersPage.html", response)
-}
-
-func Follow(c echo.Context) error {
-	db := db.Get()
-
-	username2 := c.FormValue("username2")
-	usernameCookie, err := c.Cookie("username")
-	if err != nil {
-		return c.String(http.StatusUnauthorized, "необходимо войти в систему")
-	}
-	username := usernameCookie.Value
-
-	var id_us2 int
-	var id_us1 int
-	log.Println("user1", usernameCookie, "user2", username2)
-
-	err = db.QueryRow("SELECT id FROM users WHERE username=$1", username2).Scan(&id_us2)
-	if err == sql.ErrNoRows {
-		return c.String(http.StatusNotFound, "Пользователь не найден")
-	}
-
-	if err != nil {
-		log.Println(err)
-
-		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
-	}
-	err = db.QueryRow("SELECT id FROM users WHERE username=$1", username).Scan(&id_us1)
-
-	if err != nil {
-		log.Println("ошибка", err)
-		return c.String(http.StatusInternalServerError, "ошибка на стороне сервера")
-	}
-
-	_, err = db.Exec("INSERT INTO followers(first_user_id,second_user_id) VALUES($1, $2) ON CONFLICT (first_user_id, second_user_id) DO NOTHING", id_us1, id_us2)
-	if err != nil {
-		log.Println(err)
-		return c.String(http.StatusInternalServerError, "внутренняя ошибка сервера")
-	}
-
-	return c.Redirect(http.StatusSeeOther, "/view-subscrives")
 }
 
 func ViewAllSubscribe(c echo.Context) error {

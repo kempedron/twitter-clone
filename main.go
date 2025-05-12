@@ -61,8 +61,6 @@ func main() {
 	private.GET("/home-page", functionsdb.SeeTweets)
 	private.GET("/search-users", functions.PageForSearch) // Страница поиска пользователей
 	private.POST("/search-method", functionsdb.SearchUsers)
-	private.POST("/follow-method", functionsdb.Follow)
-	private.GET("/follow-page", functions.FollowPage)
 	private.GET("/view-subscrives", functionsdb.ViewAllSubscribe)
 	private.GET("/get-chats", functionsChat.GetChats)
 	private.POST("/create-new-group", functionsGroups.CreateNewGroup)
