@@ -87,7 +87,7 @@
         {{range .}}
             <div class="chat-item">
                 <span>{{.GroupChatName}}</span>
-                <form action="/api/messages" method="get">
+                <form action="/view-chat-group/{{.GroupChatID}}" method="get">
                     <button type="submit" class="chat-button">Открыть</button>
                 </form>
             </div>

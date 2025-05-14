@@ -36,3 +36,4 @@ func ViewSubscribes(c echo.Context) error {
 func CreateGroupPage(c echo.Context) error {
 	return c.File("templates/NewGroupPage.html")
 }
+

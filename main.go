@@ -74,7 +74,10 @@ func main() {
 	private.GET("/create-new-post", functionsdb.CreateNewPostPage)
 	private.POST("/create-new-post", functionsdb.CreateNewPost)
 	private.GET("/chat-groups", functionsChat.ViewAllChatGroup)
-	private.GET("/view-chat-group/:chat-group-id", functionsChat.GetMessagesForCHatGroup)
+	private.GET("/add-user-to-chat-page/:chat-group-id", functionsChat.AddToChatGroupPage)
+	private.POST("/add-user-to/:chat-group-id", functionsChat.AddToChatGroup)
+	private.GET("/view-chat-group/:chat-group-id", functionsChat.GetMessagesForGCH)
+	private.POST("/GCH-send/:chat_id/user/:user_id", functionsChat.PostMessageForGCH)
 
 	if err := e.Start("127.0.0.1:8080"); err != nil {
 		log.Println(err)

@@ -2,24 +2,19 @@ package functionsChat
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	db "twitter/DataBase"
 
 	"github.com/gorilla/sessions"
-	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
-var clients = make(map[string]map[*websocket.Conn]bool) // map[chatID]map[conn]bool
-var mu sync.Mutex
 var Store = sessions.NewCookieStore([]byte("secret-key"))
 
 type Message struct {
@@ -147,6 +142,21 @@ func WriteMessageByID(msg Message) error {
 	return nil
 }
 
+func WriteMessageByIDForGCH(msg Message) error {
+	db := db.Get()
+
+	if db == nil {
+		return errors.New("database connection is not initialized")
+	}
+
+	query := `INSERT INTO messages_gch(chat_id, user_id, content) VALUES ($1, $2, $3) RETURNING id`
+	if err := db.QueryRow(query, msg.ChatID, msg.UserID, msg.Content).Scan(&msg.ID); err != nil {
+		log.Println("ошибка:", err)
+		return err
+	}
+	return nil
+}
+
 func GetMessages(c echo.Context) error {
 	db := db.Get()
 
@@ -266,23 +276,54 @@ func PostMessage(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, "Ошибка сохранения сообщения")
 	}
 
-	// Формируем JSON для отправки через WebSocket
-	msgJSON, err := json.Marshal(msg)
-	if err != nil {
-		log.Printf("Ошибка маршалинга сообщения: %v", err)
-	} else {
-		// Отправляем через WebSocket всем подписчикам этого чата
-		mu.Lock()
-		for conn := range clients[chatIDStr] {
-			if err := conn.WriteMessage(websocket.TextMessage, msgJSON); err != nil {
-				conn.Close()
-				delete(clients[chatIDStr], conn)
-			}
-		}
-		mu.Unlock()
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/api/messages/%d", chatID))
+}
+
+func PostMessageForGCH(c echo.Context) error {
+	db := db.Get()
+	if db == nil {
+		return c.String(http.StatusInternalServerError, "Database connection error")
 	}
 
-	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/api/messages/%d", chatID))
+	// Получаем параметры
+	chatIDStr := c.Param("chat_id")
+	userIDStr := c.Param("user_id")
+	content := strings.TrimSpace(c.FormValue("message"))
+
+	// Валидация и преобразование параметров
+	chatID, err := strconv.Atoi(chatIDStr)
+	log.Println(1)
+	if err != nil || chatID <= 0 {
+		log.Printf("error chatID for post GCH func.Err: %s", err)
+		return c.String(http.StatusBadRequest, "Неверный ID чата")
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil || userID <= 0 {
+		return c.String(http.StatusBadRequest, "Неверный ID пользователя")
+	}
+
+	// Получаем username
+	var username string
+	err = db.QueryRow("SELECT username FROM users WHERE id = $1", userID).Scan(&username)
+	if err != nil {
+		return c.String(http.StatusNotFound, "Пользователь не найден")
+	}
+
+	// Создаем сообщение
+	msg := Message{
+		ChatID:   chatID,
+		UserID:   strconv.Itoa(userID),
+		Username: username,
+		Content:  content,
+	}
+
+	// Сохраняем в БД
+	if err := WriteMessageByIDForGCH(msg); err != nil {
+		return c.String(http.StatusInternalServerError, "Ошибка сохранения сообщения")
+	}
+
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/view-chat-group/%d", chatID))
 }
 
 func AuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -459,15 +500,23 @@ func ViewAllChatGroup(c echo.Context) error {
 
 }
 
-func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
+type DataForGroupChats struct {
+	ChatID   int
+	UserID   string
+	Messages []Message
+	Members  []string
+}
+
+func GetMessageByrIDForGCH(chatID int) (DataForGroupChats, error) {
 	db := db.Get()
 	if db == nil {
-		return ChatPageData{}, errors.New("database connection is not initialized")
+		return DataForGroupChats{}, errors.New("database connection is not initialized")
 	}
 
-	data := ChatPageData{
+	data := DataForGroupChats{
 		ChatID:   chatID,
 		Messages: []Message{},
+		Members:  []string{},
 	}
 
 	// Получаем user_id из первого сообщения в чате (если есть)
@@ -483,7 +532,7 @@ func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
 	}
 	if err != nil {
 		log.Printf("Error getting user_id: %v", err)
-		return ChatPageData{}, fmt.Errorf("error getting chat info: %v", err)
+		return DataForGroupChats{}, fmt.Errorf("error getting chat info: %v", err)
 	}
 
 	// Получаем username (если user_id найден)
@@ -493,7 +542,7 @@ func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
         WHERE id = $1`, userID).Scan(&username)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting username: %v", err)
-		return ChatPageData{}, fmt.Errorf("error getting user info: %v", err)
+		return DataForGroupChats{}, fmt.Errorf("error getting user info: %v", err)
 	}
 
 	// Получаем все сообщения чата
@@ -512,7 +561,7 @@ func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error querying messages: %v", err)
-		return ChatPageData{}, fmt.Errorf("error getting messages: %v", err)
+		return DataForGroupChats{}, fmt.Errorf("error getting messages: %v", err)
 	}
 	defer rows.Close()
 
@@ -536,16 +585,40 @@ func GetMessageByrIDForGCH(chatID int) (ChatPageData, error) {
 	// Проверяем ошибки итерации
 	if err = rows.Err(); err != nil {
 		log.Printf("Rows iteration error: %v", err)
-		return ChatPageData{}, fmt.Errorf("error processing messages: %v", err)
+		return DataForGroupChats{}, fmt.Errorf("error processing messages: %v", err)
 	}
 
 	// Устанавливаем UserID для ChatPageData (как строку)
 	data.UserID = strconv.Itoa(userID)
 
+	query := `
+		SELECT 
+			u.username
+		FROM users u
+		JOIN group_chat gch ON u.id = gch.member_id
+		WHERE gch.group_chat_id=$1`
+
+	rows, err = db.Query(query, chatID)
+	if err != nil {
+		log.Printf("error in sql-qury for get []users: %s", err)
+		return DataForGroupChats{}, fmt.Errorf("error getting usernames: %s", err)
+	}
+	defer rows.Close()
+	var users []string
+	for rows.Next() {
+		var user string
+		err := rows.Scan(&user)
+		if err != nil {
+			log.Printf("error in scan sql row for []users: %s", err)
+			continue
+		}
+		users = append(users, user)
+	}
+	data.Members = users
 	return data, nil
 }
 
-func GetMessagesForCHatGroup(c echo.Context) error {
+func GetMessagesForGCH(c echo.Context) error {
 	db := db.Get()
 
 	// Получаем chat_id из URL
@@ -570,11 +643,59 @@ func GetMessagesForCHatGroup(c echo.Context) error {
 	// Получаем данные чата
 	chatData, err := GetMessageByrIDForGCH(chatID)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "Ошибка загрузки чата")
+		return c.String(http.StatusInternalServerError, "ошибка при получении сообщений")
 	}
 
 	// Устанавливаем UserID для шаблона
 	chatData.UserID = strconv.Itoa(userID)
+	if err := c.Render(http.StatusOK, "chatPageForGroupChat.html", chatData); err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "Ошибка рендеринга страницы")
+	}
+	return nil
+}
 
-	return c.Render(http.StatusOK, "chatPage.html", chatData)
+func AddToChatGroup(c echo.Context) error {
+	if c.Request().Method == http.MethodPost {
+		db := db.Get()
+		groupChatID := c.Param("chat-group-id")
+		log.Println(groupChatID)
+		GChatID, err := strconv.Atoi(groupChatID)
+		if err != nil {
+			log.Printf("error in AddToChatGroup(convertion groupChatID): %s", err)
+			return c.String(http.StatusInternalServerError, "ошибка на строне сервера")
+		}
+		usernameForAdd := c.FormValue("usernameForAdd")
+		log.Println(groupChatID, usernameForAdd)
+
+		if groupChatID == "" || usernameForAdd == "" {
+			log.Printf("error(no get valeus): %s", err)
+			return c.String(http.StatusInternalServerError, "поля не должны быть пустыми")
+		}
+		query := `INSERT INTO group_chat(group_chat_id, member_id) VALUES($1,(select id from users WHERE username=$2))`
+		_, err = db.Exec(query, GChatID, usernameForAdd)
+		if err != nil {
+			if pgErr, ok := err.(*pq.Error); ok {
+				// Конкретная проверка на нарушение уникальности первичного ключа
+				if pgErr.Code == "23505" && pgErr.Constraint == "group_chat_pkey" {
+					return c.JSON(http.StatusInternalServerError, "пользователь уже состоит в чате")
+				}
+			}
+			log.Printf("error in AddToChatGroup: %s", err)
+			return c.String(http.StatusInternalServerError, "ошибка сервера")
+		}
+
+		return c.String(http.StatusOK, fmt.Sprintf("вы успешно пригласили пользователя %s", usernameForAdd))
+	}
+	return c.JSON(http.StatusMethodNotAllowed, map[string]string{
+		"error": "NotAllowedRequesMethod",
+	})
+}
+
+func AddToChatGroupPage(c echo.Context) error {
+	ID := c.Param("chat-group-id")
+	data := map[string]string{
+		"GroupChatID": ID,
+	}
+	return c.Render(http.StatusOK, "AddUserToChat.html", data)
 }
